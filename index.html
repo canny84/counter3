@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Protein Supply Chain DApp</title>
+</head>
+<body>
+  <h1>Protein Supply Chain Anti-Counterfeit</h1>
+
+  <!-- Connect Wallet -->
+  <button onclick="connectWallet()">🔗 Connect Wallet</button>
+  <p><strong>Wallet:</strong> <span id="walletAddress">Not connected</span></p>
+  <hr>
+
+  <!-- 1. Platform Functions -->
+  <h2>Platform Functions</h2>
+  <input type="text" id="labAddress" placeholder="Lab address" />
+  <button onclick="addLab()">➕ Add Lab</button><br><br>
+
+  <input type="text" id="mfrAddress" placeholder="Manufacturer address" />
+  <button onclick="registerManufacturer()">🏭 Register Manufacturer</button><br><br>
+
+  <input type="number" id="strikeThreshold" placeholder="Strike threshold" />
+  <button onclick="setStrikeThreshold()">⚠️ Set Strike Threshold</button><br><br>
+
+  <input type="number" id="rewardAmount" placeholder="Customer reward (wei)" />
+  <button onclick="setCustomerReward()">💰 Set Customer Reward</button><br><br>
+
+  <input type="number" id="insuranceAmount" placeholder="Insurance payout (wei)" />
+  <button onclick="setCustomerInsurance()">🏦 Set Insurance Payout</button>
+  <hr>
+
+  <!-- 2. Platform Receiving -->
+  <h2>Platform: Receive Products</h2>
+  <input type="text" id="receiveBatchId" placeholder="Batch ID" /><br>
+  <input type="text" id="receiveProductIds" placeholder="Comma-separated product IDs" /><br>
+  <button onclick="platformReceive()">📥 Receive Products</button>
+  <hr>
+
+  <!-- 3. Manufacturer Functions -->
+  <h2>Manufacturer Functions</h2>
+  <input type="text" id="batchId" placeholder="Batch ID (bytes32 hex)" /><br>
+  <input type="text" id="productIds" placeholder="Comma-separated product IDs (bytes32 hex)" /><br>
+  <input type="text" id="metaURI" placeholder="Metadata URI" /><br>
+  <button onclick="registerBatch()">📦 Register Batch with Products</button>
+  <hr>
+
+  <!-- 4. Lab Functions -->
+  <h2>Lab Functions</h2>
+  <input type="text" id="labProductId" placeholder="Product ID" /><br>
+  <input type="text" id="labReportURI" placeholder="Lab report URI" /><br>
+  <select id="labIsAuthentic">
+    <option value="true">Authentic</option>
+    <option value="false">Counterfeit</option>
+  </select>
+  <button onclick="submitLabResult()">🧪 Submit Lab Result</button>
+  <hr>
+
+  <!-- 5. Customer Functions -->
+  <h2>Customer Functions</h2>
+  <input type="text" id="customerProductId" placeholder="Product ID" />
+  <button onclick="customerReceive()">📦 Receive Product</button><br><br>
+
+  <input type="text" id="reportProductId" placeholder="Product ID" /><br>
+  <input type="text" id="evidenceURI" placeholder="Evidence URI" /><br>
+  <button onclick="customerReport()">⚠️ Report Counterfeit</button>
+  <hr>
+
+  <!-- 6. Queries -->
+  <h2>Query Product</h2>
+  <input type="text" id="queryProductId" placeholder="Product ID" />
+  <button onclick="getProductInfo()">🔍 Get Product Info</button>
+  <pre id="productInfo"></pre>
+
+  <!-- ✅ ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    // ✅ Contract Address & ABI (same as before)
+    const contractAddress = "0x8d4DAc0fb3ac920EEce682DCC4240B79fd97b1E9"; 
+    const abi = [
+      {"inputs":[{"internalType":"address","name":"_platform","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"lab","type":"address"}],"name":"LabAdded","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"lab","type":"address"}],"name":"LabRemoved","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"mfr","type":"address"}],"name":"ManufacturerRegistered","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"mfr","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"ManufacturerBlacklisted","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"mfr","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"ManufacturerUnblacklisted","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"batchId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"},{"indexed":false,"internalType":"uint256","name":"productCount","type":"uint256"},{"indexed":false,"internalType":"string","name":"metaURI","type":"string"}],"name":"BatchRegistered","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"productId","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"batchId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"}],"name":"ProductRegistered","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"productId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint64","name":"timestamp","type":"uint64"}],"name":"CustodyTransferred","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"productId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"},{"indexed":true,"internalType":"address","name":"lastHolder","type":"address"},{"indexed":false,"internalType":"uint64","name":"timestamp","type":"uint64"}],"name":"ProductRecalled","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"productId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"lab","type":"address"},{"indexed":false,"internalType":"bool","name":"isAuthentic","type":"bool"},{"indexed":false,"internalType":"string","name":"labReportURI","type":"string"},{"indexed":false,"internalType":"uint64","name":"timestamp","type":"uint64"}],"name":"LabResult","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"},{"indexed":false,"internalType":"uint256","name":"totalCounterfeits","type":"uint256"}],"name":"ThresholdBreached","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"RecallInitiated","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"productId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"customer","type":"address"},{"indexed":false,"internalType":"string","name":"evidenceURI","type":"string"},{"indexed":false,"internalType":"uint64","name":"timestamp","type":"uint64"}],"name":"CustomerReported","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"manufacturer","type":"address"},{"indexed":false,"internalType":"uint256","name":"count","type":"uint256"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"RandomSamplingTriggered","type":"event"},
+      {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"customer","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountWei","type":"uint256"}],"name":"CustomerRewardPaid","type":"event"},
+      {"inputs":[{"internalType":"address","name":"lab","type":"address"}],"name":"addLab","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address","name":"mfr","type":"address"}],"name":"registerManufacturer","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"threshold","type":"uint256"}],"name":"setStrikeThreshold","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"amountWei","type":"uint256"}],"name":"setCustomerReportReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"amountWei","type":"uint256"}],"name":"setCustomerInsurancePayout","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"batchId","type":"bytes32"},{"internalType":"bytes32[]","name":"productIds","type":"bytes32[]"},{"internalType":"string","name":"metaURI","type":"string"}],"name":"registerBatchWithProducts","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"batchId","type":"bytes32"},{"internalType":"bytes32[]","name":"productIds","type":"bytes32[]"}],"name":"platformReceiveProducts","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"productId","type":"bytes32"}],"name":"customerReceiveProduct","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"productId","type":"bytes32"},{"internalType":"bool","name":"isAuthentic","type":"bool"},{"internalType":"string","name":"labReportURI","type":"string"}],"name":"submitLabResult","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"productId","type":"bytes32"}],"name":"recallProduct","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32[]","name":"productIds","type":"bytes32[]"}],"name":"recallProductsBulk","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"productId","type":"bytes32"},{"internalType":"string","name":"evidenceURI","type":"string"}],"name":"customerReport","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address payable","name":"customer","type":"address"}],"name":"payCustomerReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"address payable","name":"customer","type":"address"}],"name":"payCustomerInsurance","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"productId","type":"bytes32"}],"name":"getProductInfo","outputs":[{"internalType":"bytes32","name":"batchId","type":"bytes32"},{"internalType":"address","name":"currentHolder","type":"address"},{"internalType":"uint8","name":"status","type":"uint8"},{"internalType":"bool","name":"recalled","type":"bool"},{"internalType":"bool","name":"counterfeitReported","type":"bool"},{"internalType":"uint64","name":"lastUpdateAt","type":"uint64"}],"stateMutability":"view","type":"function"}
+    ];
+
+    let provider, signer, contract, user;
+
+    async function connectWallet() {
+      if (!window.ethereum) return alert("❌ MetaMask not detected");
+      await ethereum.request({ method: "eth_requestAccounts" });
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      user = await signer.getAddress();
+      document.getElementById("walletAddress").innerText = user;
+      contract = new ethers.Contract(contractAddress, abi, signer);
+      alert("✅ Wallet connected");
+    }
+
+    // Platform
+    async function addLab() { const tx = await contract.addLab(document.getElementById("labAddress").value); await tx.wait(); alert("✅ Lab added"); }
+    async function registerManufacturer() { const tx = await contract.registerManufacturer(document.getElementById("mfrAddress").value); await tx.wait(); alert("✅ Manufacturer registered"); }
+    async function setStrikeThreshold() { const tx = await contract.setStrikeThreshold(document.getElementById("strikeThreshold").value); await tx.wait(); alert("✅ Threshold set"); }
+    async function setCustomerReward() { const tx = await contract.setCustomerReportReward(document.getElementById("rewardAmount").value); await tx.wait(); alert("✅ Reward set"); }
+    async function setCustomerInsurance() { const tx = await contract.setCustomerInsurancePayout(document.getElementById("insuranceAmount").value); await tx.wait(); alert("✅ Insurance set"); }
+
+    // Platform Receiving
+    async function platformReceive() {
+      const batchId = document.getElementById("receiveBatchId").value;
+      const productIds = document.getElementById("receiveProductIds").value.split(",").map(x=>x.trim());
+      const tx = await contract.platformReceiveProducts(batchId, productIds);
+      await tx.wait(); alert("✅ Products received");
+    }
+
+    // Manufacturer
+    async function registerBatch() {
+      const batchId = document.getElementById("batchId").value;
+      const productIds = document.getElementById("productIds").value.split(",").map(x=>x.trim());
+      const meta = document.getElementById("metaURI").value;
+      const tx = await contract.registerBatchWithProducts(batchId, productIds, meta);
+      await tx.wait(); alert("✅ Batch registered");
+    }
+
+    // Lab
+    async function submitLabResult() {
+      const pid = document.getElementById("labProductId").value;
+      const uri = document.getElementById("labReportURI").value;
+      const auth = document.getElementById("labIsAuthentic").value === "true";
+      const tx = await contract.submitLabResult(pid, auth, uri);
+      await tx.wait(); alert("✅ Lab result submitted");
+    }
+
+    // Customer
+    async function customerReceive() { const tx = await contract.customerReceiveProduct(document.getElementById("customerProductId").value); await tx.wait(); alert("✅ Product received"); }
+    async function customerReport() { const tx = await contract.customerReport(document.getElementById("reportProductId").value, document.getElementById("evidenceURI").value); await tx.wait(); alert("✅ Report submitted"); }
+
+    // Queries
+    async function getProductInfo() {
+      const info = await contract.getProductInfo(document.getElementById("queryProductId").value);
+      document.getElementById("productInfo").innerText = JSON.stringify(info, null, 2);
+    }
+  </script>
+</body>
+</html>
